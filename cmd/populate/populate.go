@@ -116,7 +116,7 @@ func syncSpacesTransactions(pg *pgx.Conn, bc *node.BitcoinClient, sc *node.Space
 				log.Printf("  Processed %d/%d transactions in block %d", txIndex, txCount, height)
 			}
 
-			tx, err = store.StoreSpacesTransaction(spaceTx, *blockHash, tx)
+			tx, err = store.StoreSpacesTransaction(ctx, spaceTx, *blockHash, tx)
 			if err != nil {
 				return err
 			}
@@ -138,6 +138,7 @@ func syncSpacesTransactions(pg *pgx.Conn, bc *node.BitcoinClient, sc *node.Space
 			if err != nil {
 				return err
 			}
+			defer tx.Rollback(ctx)
 			q = db.New(tx)
 
 			log.Printf("Committed progress at block %d", height)

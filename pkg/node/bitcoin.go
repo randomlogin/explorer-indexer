@@ -84,7 +84,7 @@ func (client *BitcoinClient) GetMempoolTxs(ctx context.Context) ([]Transaction, 
 		return nil, err
 	}
 	for _, txid := range txids {
-		tx, err := client.GetTransaction(context.Background(), txid)
+		tx, err := client.GetTransaction(ctx, txid)
 		if err != nil {
 			return nil, err
 		}

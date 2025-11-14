@@ -26,9 +26,9 @@ func max(a, b int) int {
 	return b
 }
 
-func StoreSpacesTransactions(txs []node.MetaTransaction, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
+func StoreSpacesTransactions(ctx context.Context, txs []node.MetaTransaction, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
 	for _, tx := range txs {
-		sqlTx, err := StoreSpacesTransaction(tx, blockHash, sqlTx)
+		sqlTx, err := StoreSpacesTransaction(ctx, tx, blockHash, sqlTx)
 		if err != nil {
 			return sqlTx, err
 		}
@@ -36,7 +36,7 @@ func StoreSpacesTransactions(txs []node.MetaTransaction, blockHash Bytes, sqlTx 
 	return sqlTx, nil
 }
 
-func StoreSpacesTransaction(tx node.MetaTransaction, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
+func StoreSpacesTransaction(ctx context.Context, tx node.MetaTransaction, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
 	q := db.New(sqlTx)
 	for _, create := range tx.Creates {
 		vmet := db.InsertVMetaOutParams{
@@ -113,7 +113,7 @@ func StoreSpacesTransaction(tx node.MetaTransaction, blockHash Bytes, sqlTx pgx.
 			}
 		}
 
-		if err := q.InsertVMetaOut(context.Background(), vmet); err != nil {
+		if err := q.InsertVMetaOut(ctx, vmet); err != nil {
 			return sqlTx, err
 		}
 	}
@@ -211,7 +211,7 @@ func StoreSpacesTransaction(tx node.MetaTransaction, blockHash Bytes, sqlTx pgx.
 			vmet.Signature = &covenant.Signature
 		}
 
-		if err := q.InsertVMetaOut(context.Background(), vmet); err != nil {
+		if err := q.InsertVMetaOut(ctx, vmet); err != nil {
 			return sqlTx, err
 		}
 
@@ -260,11 +260,11 @@ func StoreSpacesTransaction(tx node.MetaTransaction, blockHash Bytes, sqlTx pgx.
 	return sqlTx, nil
 }
 
-func StoreBitcoinBlock(block *node.Block, tx pgx.Tx) (pgx.Tx, error) {
+func StoreBitcoinBlock(ctx context.Context, block *node.Block, tx pgx.Tx) (pgx.Tx, error) {
 	q := db.New(tx)
 	blockParams := db.UpsertBlockParams{}
 	copier.Copy(&blockParams, &block)
-	wasInserted, err := q.UpsertBlock(context.Background(), blockParams)
+	wasInserted, err := q.UpsertBlock(ctx, blockParams)
 	if err != nil {
 		return tx, err
 	}
@@ -275,7 +275,7 @@ func StoreBitcoinBlock(block *node.Block, tx pgx.Tx) (pgx.Tx, error) {
 		log.Printf("Batch inserting %d transactions for block", len(batchParams))
 
 		// Batch insert all transactions at once using PostgreSQL COPY protocol
-		rowsAffected, err := q.InsertBatchTransactions(context.Background(), batchParams)
+		rowsAffected, err := q.InsertBatchTransactions(ctx, batchParams)
 		if err != nil {
 			return tx, fmt.Errorf("batch insert transactions: %w", err)
 		}
@@ -285,7 +285,7 @@ func StoreBitcoinBlock(block *node.Block, tx pgx.Tx) (pgx.Tx, error) {
 	return tx, nil
 }
 
-func storeTransactionBase(q *db.Queries, transaction *node.Transaction, blockHash *Bytes, txIndex *int32) error {
+func storeTransactionBase(ctx context.Context, q *db.Queries, transaction *node.Transaction, blockHash *Bytes, txIndex *int32) error {
 	// Calculate aggregates for all transactions
 	inputCount, outputCount, totalOutputValue := calculateAggregates(transaction)
 
@@ -297,7 +297,7 @@ func storeTransactionBase(q *db.Queries, transaction *node.Transaction, blockHas
 		params.InputCount = inputCount
 		params.OutputCount = outputCount
 		params.TotalOutputValue = totalOutputValue
-		return q.InsertTransaction(context.Background(), params)
+		return q.InsertTransaction(ctx, params)
 	}
 	params := db.InsertMempoolTransactionParams{}
 	copier.Copy(&params, transaction)
@@ -305,7 +305,7 @@ func storeTransactionBase(q *db.Queries, transaction *node.Transaction, blockHas
 	params.InputCount = inputCount
 	params.OutputCount = outputCount
 	params.TotalOutputValue = totalOutputValue
-	return q.InsertMempoolTransaction(context.Background(), params)
+	return q.InsertMempoolTransaction(ctx, params)
 }
 
 // calculateAggregates computes input/output counts and total output value
@@ -404,7 +404,7 @@ func StoreBlock(ctx context.Context, pg *pgx.Conn, block *node.Block, sc *node.S
 	defer tx.Rollback(ctx)
 
 	// Store Bitcoin block
-	tx, err = StoreBitcoinBlock(block, tx)
+	tx, err = StoreBitcoinBlock(ctx, block, tx)
 	if err != nil {
 		return err
 	}
@@ -415,7 +415,7 @@ func StoreBlock(ctx context.Context, pg *pgx.Conn, block *node.Block, sc *node.S
 			return err
 		}
 
-		tx, err = StoreSpacesTransactions(spacesBlock.Transactions, block.Hash, tx)
+		tx, err = StoreSpacesTransactions(ctx, spacesBlock.Transactions, block.Hash, tx)
 		if err != nil {
 			return err
 		}
@@ -424,8 +424,8 @@ func StoreBlock(ctx context.Context, pg *pgx.Conn, block *node.Block, sc *node.S
 	return tx.Commit(ctx)
 }
 
-func StoreTransaction(q *db.Queries, transaction *node.Transaction, blockHash *Bytes, txIndex *int32) error {
-	if err := storeTransactionBase(q, transaction, blockHash, txIndex); err != nil {
+func StoreTransaction(ctx context.Context, q *db.Queries, transaction *node.Transaction, blockHash *Bytes, txIndex *int32) error {
+	if err := storeTransactionBase(ctx, q, transaction, blockHash, txIndex); err != nil {
 		return err
 	}
 	return nil
