@@ -272,7 +272,7 @@ func StoreBitcoinBlock(ctx context.Context, block *node.Block, tx pgx.Tx) (pgx.T
 		// Prepare all transactions for batch insert
 		batchParams := prepareBatchTransactions(block.Transactions, &blockParams.Hash)
 
-		log.Printf("Batch inserting %d transactions for block", len(batchParams))
+		log.Printf("Batch inserting %d transactions for block %s", len(batchParams), &blockParams.Hash)
 
 		// Batch insert all transactions at once using PostgreSQL COPY protocol
 		rowsAffected, err := q.InsertBatchTransactions(ctx, batchParams)
@@ -368,8 +368,14 @@ func GetSyncedHead(ctx context.Context, pg *pgx.Conn, bc *node.BitcoinClient) (i
 			return -1, nil, err
 		}
 		//takes the block of same height from the bitcoin node
+		// modify that if it doesn't work we descend by
 		nodeHash, err := bc.GetBlockHash(ctx, int(height))
 		if err != nil {
+			//do we need that?
+			if strings.Contains(err.Error(), "Block height out of range") {
+				height -= 1
+				continue
+			}
 			return -1, nil, err
 		}
 		// nodeHash *bytes

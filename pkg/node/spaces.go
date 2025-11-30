@@ -38,6 +38,16 @@ func (client *SpacesClient) GetBlockMeta(ctx context.Context, blockHash interfac
 	return txs, err
 }
 
+// func (client *SpacesClient) GetPtrBlockMeta(ctx context.Context, blockHash interface{}) (*SpacesPtrBlock, error) {
+// 	txs := new(SpacesBlock)
+// 	err := client.Rpc(ctx, "getptrblockmeta", []interface{}{blockHash}, txs)
+// 	if err != nil {
+// 		log.Print(err)
+// 		return nil, err
+// 	}
+// 	return txs, err
+// }
+
 func (client *SpacesClient) GetTxMeta(ctx context.Context, txId string) (*MetaTransaction, error) {
 	metaTx := new(MetaTransaction)
 	err := client.Rpc(ctx, "gettxmeta", []interface{}{txId}, metaTx)

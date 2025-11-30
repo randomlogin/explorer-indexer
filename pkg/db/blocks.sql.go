@@ -251,6 +251,11 @@ func (q *Queries) UpdateRootAnchor(ctx context.Context, arg UpdateRootAnchorPara
 }
 
 const upsertBlock = `-- name: UpsertBlock :one
+WITH orphan_existing AS (
+    UPDATE blocks
+    SET orphan = true, height = -2
+    WHERE height = $5 AND hash != $1 AND orphan = false
+)
 INSERT INTO blocks (
     hash,
     size,
