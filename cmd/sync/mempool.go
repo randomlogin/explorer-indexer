@@ -170,9 +170,9 @@ func processTxGroup(ctx context.Context, sqlTx pgx.Tx, bc *node.BitcoinClient, s
 				return err
 			}
 
-			if sqlTx, err = store.StoreSpacesPtrTransaction(ctx, *lastMetaTx, deadbeef, sqlTx); err != nil {
-				return err
-			}
+			// if sqlTx, err = store.StoreSpacesPtrTransaction(ctx, *lastMetaTx, deadbeef, sqlTx); err != nil {
+			// 	return err
+			// }
 		}
 	}
 	return nil
