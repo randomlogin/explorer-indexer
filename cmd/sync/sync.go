@@ -121,7 +121,8 @@ func syncRootAnchors(ctx context.Context, pg *pgx.Conn, sc *node.SpacesClient) e
 	params := db.UpdateRootAnchorParams{}
 	for _, rootAnchor := range result {
 		params.Hash = rootAnchor.Block.Hash
-		params.RootAnchor = &rootAnchor.Root
+		params.SpacesRoot = &rootAnchor.SpacesRoot
+		params.PointersRoot = &rootAnchor.PointersRoot
 
 		if err := q.UpdateRootAnchor(ctx, params); err != nil {
 			log.Printf("error updating root anchor %d: %v", rootAnchor, err)
@@ -173,6 +174,9 @@ func syncRollouts(ctx context.Context, pg *pgx.Conn, sc *node.SpacesClient) erro
 	}
 	return nil
 }
+
+// func syncCommitments(ctx context.Context, pg *pgx.Conn, sc *node.SpacesClient) error {
+// }
 
 func syncBlocks(ctx context.Context, pg *pgx.Conn, bc *node.BitcoinClient, sc *node.SpacesClient) error {
 	var hash *Bytes

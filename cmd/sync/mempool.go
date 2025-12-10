@@ -21,6 +21,8 @@ func syncMempool(ctx context.Context, pg *pgx.Conn, bc *node.BitcoinClient, sc *
 		return err
 	}
 
+	log.Print(currentGroups)
+
 	// Build current mempool map
 	nodeMempoolTxs := make(map[string]struct{})
 	for _, group := range currentGroups {
@@ -75,14 +77,18 @@ func syncMempool(ctx context.Context, pg *pgx.Conn, bc *node.BitcoinClient, sc *
 		default:
 		}
 		sqlTx, err := pg.BeginTx(ctx, pgx.TxOptions{})
+		log.Print("ebl1")
 		if err != nil {
 			return err
 		}
 
 		if err := processTxGroup(ctx, sqlTx, bc, sc, txGroup, deadbeef); err != nil {
+			log.Print("ebl2")
 			sqlTx.Rollback(ctx)
 			return err
 		}
+
+		log.Print("ebl")
 
 		if err := sqlTx.Commit(ctx); err != nil {
 			sqlTx.Rollback(ctx)
@@ -147,7 +153,9 @@ func processTxGroup(ctx context.Context, sqlTx pgx.Tx, bc *node.BitcoinClient, s
 
 		// Store only the last transaction (dependent one)
 		if i == len(txGroup)-1 {
+			log.Print("pizdos")
 			if err := store.StoreTransaction(ctx, q, tx, &deadbeef, nil); err != nil {
+				log.Print("pizdosaaaa:w")
 				return err
 			}
 		}

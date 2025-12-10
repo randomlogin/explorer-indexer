@@ -28,9 +28,9 @@ func (client *SpacesClient) GetRollOut(ctx context.Context, number int) (*[]Roll
 	return &rollout, err
 }
 
-func (client *SpacesClient) GetBlockMeta(ctx context.Context, blockHash interface{}) (*SpacesBlock, error) {
+func (client *SpacesClient) GetBlockMeta(ctx context.Context, blockIdentifier interface{}) (*SpacesBlock, error) {
 	txs := new(SpacesBlock)
-	err := client.Rpc(ctx, "getblockmeta", []interface{}{blockHash}, txs)
+	err := client.Rpc(ctx, "getblockmeta", []interface{}{blockIdentifier}, txs)
 	if err != nil {
 		log.Print(err)
 		return nil, err
@@ -38,15 +38,15 @@ func (client *SpacesClient) GetBlockMeta(ctx context.Context, blockHash interfac
 	return txs, err
 }
 
-// func (client *SpacesClient) GetPtrBlockMeta(ctx context.Context, blockHash interface{}) (*SpacesPtrBlock, error) {
-// 	txs := new(SpacesBlock)
-// 	err := client.Rpc(ctx, "getptrblockmeta", []interface{}{blockHash}, txs)
-// 	if err != nil {
-// 		log.Print(err)
-// 		return nil, err
-// 	}
-// 	return txs, err
-// }
+func (client *SpacesClient) GetPtrBlockMeta(ctx context.Context, blockIdentifier interface{}) (*PtrBlock, error) {
+	ptrBlock := new(PtrBlock)
+	err := client.Rpc(ctx, "getptrblockmeta", []interface{}{blockIdentifier}, ptrBlock)
+	if err != nil {
+		log.Print(err)
+		return nil, err
+	}
+	return ptrBlock, err
+}
 
 func (client *SpacesClient) GetTxMeta(ctx context.Context, txId string) (*MetaTransaction, error) {
 	metaTx := new(MetaTransaction)

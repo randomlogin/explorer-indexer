@@ -29,10 +29,14 @@ SET
 RETURNING (xmax = 0)::boolean AS was_inserted;
 
 
+-- name: UpdateSpacesRoot :exec
+UPDATE blocks set spaces_root = ($1) where hash = ($2);
+
+-- name: UpdatePointersRoot :exec
+UPDATE blocks set pointers_root = ($1) where hash = ($2);
+
 -- name: UpdateRootAnchor :exec
-UPDATE blocks set root_anchor = ($1) where hash = ($2);
-
-
+UPDATE blocks set (spaces_root, pointers_root) = ($1, $2) where hash = ($3);
 
 -- name: GetBlocks :many
 SELECT blocks.*, (

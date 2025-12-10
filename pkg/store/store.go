@@ -19,12 +19,12 @@ import (
 
 const deadbeefString = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
+// func max(a, b int) int {
+// 	if a > b {
+// 		return a
+// 	}
+// 	return b
+// }
 
 func StoreSpacesTransactions(ctx context.Context, txs []node.MetaTransaction, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
 	for _, tx := range txs {
@@ -33,6 +33,65 @@ func StoreSpacesTransactions(ctx context.Context, txs []node.MetaTransaction, bl
 			return sqlTx, err
 		}
 	}
+	return sqlTx, nil
+}
+
+func StoreSpacesPtrTransactions(ctx context.Context, txs []node.PtrTxMeta, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
+	for _, tx := range txs {
+		sqlTx, err := StoreSpacesPtrTransaction(ctx, tx, blockHash, sqlTx)
+		if err != nil {
+			return sqlTx, err
+		}
+	}
+	return sqlTx, nil
+}
+
+func StoreSpacesPtrTransaction(ctx context.Context, tx node.PtrTxMeta, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
+	q := db.New(sqlTx)
+
+	for _, commitment := range tx.Commitments {
+		if commitment.Space[0] == '@' {
+			commitment.Space = commitment.Space[1:]
+		}
+		err := q.InsertCommitment(ctx, db.InsertCommitmentParams{
+			BlockHash:  blockHash,
+			Txid:       tx.TxID,
+			Name:       commitment.Space,
+			StateRoot:  &commitment.StateRoot,
+			Revocation: false,
+		})
+		if err != nil {
+			return sqlTx, fmt.Errorf("failed to insert commitment: %w", err)
+		}
+	}
+
+	for _, revokedCommitment := range tx.RevokedCommitments {
+		if revokedCommitment.Space[0] == '@' {
+			revokedCommitment.Space = revokedCommitment.Space[1:]
+		}
+		log.Printf("%+v", revokedCommitment)
+		exists, err := q.CommitmentExists(ctx, db.CommitmentExistsParams{
+			Name:      revokedCommitment.Space,
+			StateRoot: &revokedCommitment.StateRoot,
+		})
+		if err != nil {
+			return sqlTx, fmt.Errorf("failed to check revoked commitment existence: %w", err)
+		}
+		if !exists {
+			log.Printf("WARNING: Revoked commitment not found, Space: %s, StateRoot: %s, TxID: %s", revokedCommitment.Space, revokedCommitment.StateRoot.String(), tx.TxID.String())
+		}
+		err = q.InsertCommitment(ctx, db.InsertCommitmentParams{
+			BlockHash:  blockHash,
+			Txid:       tx.TxID,
+			Name:       revokedCommitment.Space,
+			StateRoot:  &revokedCommitment.StateRoot,
+			Revocation: true,
+		})
+		if err != nil {
+			return sqlTx, fmt.Errorf("failed to insert revoked commitment: %w", err)
+		}
+	}
+
 	return sqlTx, nil
 }
 
@@ -286,9 +345,7 @@ func StoreBitcoinBlock(ctx context.Context, block *node.Block, tx pgx.Tx) (pgx.T
 }
 
 func storeTransactionBase(ctx context.Context, q *db.Queries, transaction *node.Transaction, blockHash *Bytes, txIndex *int32) error {
-	// Calculate aggregates for all transactions
 	inputCount, outputCount, totalOutputValue := calculateAggregates(transaction)
-
 	if blockHash.String() != deadbeefString {
 		params := db.InsertTransactionParams{}
 		copier.Copy(&params, transaction)
@@ -425,12 +482,24 @@ func StoreBlock(ctx context.Context, pg *pgx.Conn, block *node.Block, sc *node.S
 		if err != nil {
 			return err
 		}
+
+		spacesPtrBlock, err := sc.GetPtrBlockMeta(ctx, block.Hash.String())
+		if err != nil {
+			return err
+		}
+
+		tx, err = StoreSpacesPtrTransactions(ctx, spacesPtrBlock.Transactions, block.Hash, tx)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	return tx.Commit(ctx)
 }
 
 func StoreTransaction(ctx context.Context, q *db.Queries, transaction *node.Transaction, blockHash *Bytes, txIndex *int32) error {
+	log.Printf("%+v", transaction)
 	if err := storeTransactionBase(ctx, q, transaction, blockHash, txIndex); err != nil {
 		return err
 	}

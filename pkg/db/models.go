@@ -73,7 +73,16 @@ type Block struct {
 	Difficulty     float64
 	Chainwork      types.Bytes
 	Orphan         bool
-	RootAnchor     *types.Bytes
+	SpacesRoot     *types.Bytes
+	PointersRoot   *types.Bytes
+}
+
+type Commitment struct {
+	BlockHash  types.Bytes
+	Txid       types.Bytes
+	Name       string
+	StateRoot  *types.Bytes
+	Revocation bool
 }
 
 type Rollout struct {
