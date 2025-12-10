@@ -21,7 +21,7 @@ func syncMempool(ctx context.Context, pg *pgx.Conn, bc *node.BitcoinClient, sc *
 		return err
 	}
 
-	log.Print(currentGroups)
+	// log.Print(currentGroups)
 
 	// Build current mempool map
 	nodeMempoolTxs := make(map[string]struct{})
@@ -77,18 +77,14 @@ func syncMempool(ctx context.Context, pg *pgx.Conn, bc *node.BitcoinClient, sc *
 		default:
 		}
 		sqlTx, err := pg.BeginTx(ctx, pgx.TxOptions{})
-		log.Print("ebl1")
 		if err != nil {
 			return err
 		}
 
 		if err := processTxGroup(ctx, sqlTx, bc, sc, txGroup, deadbeef); err != nil {
-			log.Print("ebl2")
 			sqlTx.Rollback(ctx)
 			return err
 		}
-
-		log.Print("ebl")
 
 		if err := sqlTx.Commit(ctx); err != nil {
 			sqlTx.Rollback(ctx)
@@ -153,9 +149,9 @@ func processTxGroup(ctx context.Context, sqlTx pgx.Tx, bc *node.BitcoinClient, s
 
 		// Store only the last transaction (dependent one)
 		if i == len(txGroup)-1 {
-			log.Print("pizdos")
+			// log.Print("pizdos")
 			if err := store.StoreTransaction(ctx, q, tx, &deadbeef, nil); err != nil {
-				log.Print("pizdosaaaa:w")
+				// log.Print("pizdosaaaa:w")
 				return err
 			}
 		}
@@ -171,6 +167,10 @@ func processTxGroup(ctx context.Context, sqlTx pgx.Tx, bc *node.BitcoinClient, s
 		if len(metaTxs) > 0 && metaTxs[len(metaTxs)-1] != nil {
 			lastMetaTx := metaTxs[len(metaTxs)-1]
 			if sqlTx, err = store.StoreSpacesTransaction(ctx, *lastMetaTx, deadbeef, sqlTx); err != nil {
+				return err
+			}
+
+			if sqlTx, err = store.StoreSpacesPtrTransaction(ctx, *lastMetaTx, deadbeef, sqlTx); err != nil {
 				return err
 			}
 		}

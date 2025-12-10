@@ -54,11 +54,12 @@ func StoreSpacesPtrTransaction(ctx context.Context, tx node.PtrTxMeta, blockHash
 			commitment.Space = commitment.Space[1:]
 		}
 		err := q.InsertCommitment(ctx, db.InsertCommitmentParams{
-			BlockHash:  blockHash,
-			Txid:       tx.TxID,
-			Name:       commitment.Space,
-			StateRoot:  &commitment.StateRoot,
-			Revocation: false,
+			BlockHash:   blockHash,
+			Txid:        tx.TxID,
+			Name:        commitment.Space,
+			StateRoot:   &commitment.StateRoot,
+			HistoryHash: &commitment.HistoryHash,
+			Revocation:  false,
 		})
 		if err != nil {
 			return sqlTx, fmt.Errorf("failed to insert commitment: %w", err)
@@ -69,7 +70,6 @@ func StoreSpacesPtrTransaction(ctx context.Context, tx node.PtrTxMeta, blockHash
 		if revokedCommitment.Space[0] == '@' {
 			revokedCommitment.Space = revokedCommitment.Space[1:]
 		}
-		log.Printf("%+v", revokedCommitment)
 		exists, err := q.CommitmentExists(ctx, db.CommitmentExistsParams{
 			Name:      revokedCommitment.Space,
 			StateRoot: &revokedCommitment.StateRoot,
@@ -81,11 +81,12 @@ func StoreSpacesPtrTransaction(ctx context.Context, tx node.PtrTxMeta, blockHash
 			log.Printf("WARNING: Revoked commitment not found, Space: %s, StateRoot: %s, TxID: %s", revokedCommitment.Space, revokedCommitment.StateRoot.String(), tx.TxID.String())
 		}
 		err = q.InsertCommitment(ctx, db.InsertCommitmentParams{
-			BlockHash:  blockHash,
-			Txid:       tx.TxID,
-			Name:       revokedCommitment.Space,
-			StateRoot:  &revokedCommitment.StateRoot,
-			Revocation: true,
+			BlockHash:   blockHash,
+			Txid:        tx.TxID,
+			Name:        revokedCommitment.Space,
+			StateRoot:   &revokedCommitment.StateRoot,
+			HistoryHash: &revokedCommitment.HistoryHash,
+			Revocation:  true,
 		})
 		if err != nil {
 			return sqlTx, fmt.Errorf("failed to insert revoked commitment: %w", err)
@@ -499,7 +500,7 @@ func StoreBlock(ctx context.Context, pg *pgx.Conn, block *node.Block, sc *node.S
 }
 
 func StoreTransaction(ctx context.Context, q *db.Queries, transaction *node.Transaction, blockHash *Bytes, txIndex *int32) error {
-	log.Printf("%+v", transaction)
+	// log.Printf("%+v", transaction)
 	if err := storeTransactionBase(ctx, q, transaction, blockHash, txIndex); err != nil {
 		return err
 	}

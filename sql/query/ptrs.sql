@@ -1,5 +1,5 @@
 -- name: InsertCommitment :exec
-INSERT INTO commitments (block_hash, txid, name, state_root, revocation) VALUES ($1, $2, $3, $4, $5);
+INSERT INTO commitments (block_hash, txid, name, state_root, history_hash, revocation) VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: CommitmentExists :one
 SELECT EXISTS(SELECT 1 FROM commitments WHERE name = $1 AND state_root = $2);

@@ -78,11 +78,12 @@ type Block struct {
 }
 
 type Commitment struct {
-	BlockHash  types.Bytes
-	Txid       types.Bytes
-	Name       string
-	StateRoot  *types.Bytes
-	Revocation bool
+	BlockHash   types.Bytes
+	Txid        types.Bytes
+	Name        string
+	StateRoot   *types.Bytes
+	HistoryHash *types.Bytes
+	Revocation  bool
 }
 
 type Rollout struct {

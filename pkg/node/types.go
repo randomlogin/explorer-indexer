@@ -225,6 +225,10 @@ func (ra *RootAnchor) UnmarshalJSON(data []byte) error {
 	if aux.PointersRoot == nil {
 		return fmt.Errorf("missing required field: ptrs_root")
 	}
+
+	if aux.PointersRoot == nil {
+		return fmt.Errorf("missing required field: ptrs_root")
+	}
 	if aux.Block == nil {
 		return fmt.Errorf("missing required field: block")
 	}

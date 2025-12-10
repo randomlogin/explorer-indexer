@@ -28,7 +28,7 @@ func (q *Queries) CommitmentExists(ctx context.Context, arg CommitmentExistsPara
 }
 
 const getCommitmentByBlockHashAndName = `-- name: GetCommitmentByBlockHashAndName :one
-SELECT block_hash, txid, name, state_root, revocation FROM commitments WHERE block_hash = $1 AND name = $2
+SELECT block_hash, txid, name, state_root, history_hash, revocation FROM commitments WHERE block_hash = $1 AND name = $2
 `
 
 type GetCommitmentByBlockHashAndNameParams struct {
@@ -44,13 +44,14 @@ func (q *Queries) GetCommitmentByBlockHashAndName(ctx context.Context, arg GetCo
 		&i.Txid,
 		&i.Name,
 		&i.StateRoot,
+		&i.HistoryHash,
 		&i.Revocation,
 	)
 	return i, err
 }
 
 const getCommitmentsByBlockHeightAndName = `-- name: GetCommitmentsByBlockHeightAndName :many
-SELECT commitments.block_hash, commitments.txid, commitments.name, commitments.state_root, commitments.revocation FROM commitments
+SELECT commitments.block_hash, commitments.txid, commitments.name, commitments.state_root, commitments.history_hash, commitments.revocation FROM commitments
 JOIN blocks ON commitments.block_hash = blocks.hash
 WHERE blocks.height = $1 AND commitments.name = $2
 `
@@ -74,6 +75,7 @@ func (q *Queries) GetCommitmentsByBlockHeightAndName(ctx context.Context, arg Ge
 			&i.Txid,
 			&i.Name,
 			&i.StateRoot,
+			&i.HistoryHash,
 			&i.Revocation,
 		); err != nil {
 			return nil, err
@@ -87,7 +89,7 @@ func (q *Queries) GetCommitmentsByBlockHeightAndName(ctx context.Context, arg Ge
 }
 
 const getLatestCommitmentByName = `-- name: GetLatestCommitmentByName :one
-SELECT commitments.block_hash, commitments.txid, commitments.name, commitments.state_root, commitments.revocation FROM commitments
+SELECT commitments.block_hash, commitments.txid, commitments.name, commitments.state_root, commitments.history_hash, commitments.revocation FROM commitments
 JOIN blocks ON commitments.block_hash = blocks.hash
 WHERE commitments.name = $1
 ORDER BY blocks.height DESC
@@ -102,21 +104,23 @@ func (q *Queries) GetLatestCommitmentByName(ctx context.Context, name string) (C
 		&i.Txid,
 		&i.Name,
 		&i.StateRoot,
+		&i.HistoryHash,
 		&i.Revocation,
 	)
 	return i, err
 }
 
 const insertCommitment = `-- name: InsertCommitment :exec
-INSERT INTO commitments (block_hash, txid, name, state_root, revocation) VALUES ($1, $2, $3, $4, $5)
+INSERT INTO commitments (block_hash, txid, name, state_root, history_hash, revocation) VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertCommitmentParams struct {
-	BlockHash  types.Bytes
-	Txid       types.Bytes
-	Name       string
-	StateRoot  *types.Bytes
-	Revocation bool
+	BlockHash   types.Bytes
+	Txid        types.Bytes
+	Name        string
+	StateRoot   *types.Bytes
+	HistoryHash *types.Bytes
+	Revocation  bool
 }
 
 func (q *Queries) InsertCommitment(ctx context.Context, arg InsertCommitmentParams) error {
@@ -125,6 +129,7 @@ func (q *Queries) InsertCommitment(ctx context.Context, arg InsertCommitmentPara
 		arg.Txid,
 		arg.Name,
 		arg.StateRoot,
+		arg.HistoryHash,
 		arg.Revocation,
 	)
 	return err
