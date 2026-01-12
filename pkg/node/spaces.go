@@ -38,9 +38,9 @@ func (client *SpacesClient) GetBlockMeta(ctx context.Context, blockIdentifier in
 	return txs, err
 }
 
-func (client *SpacesClient) GetPtrBlockMeta(ctx context.Context, blockIdentifier interface{}) (*PtrBlock, error) {
+func (client *SpacesClient) GetPtrBlockMeta(ctx context.Context, blockIdentifier any) (*PtrBlock, error) {
 	ptrBlock := new(PtrBlock)
-	err := client.Rpc(ctx, "getptrblockmeta", []interface{}{blockIdentifier}, ptrBlock)
+	err := client.Rpc(ctx, "getptrblockmeta", []any{blockIdentifier}, ptrBlock)
 	if err != nil {
 		log.Print(err)
 		return nil, err

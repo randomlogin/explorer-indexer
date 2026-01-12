@@ -19,13 +19,6 @@ import (
 
 const deadbeefString = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 
-// func max(a, b int) int {
-// 	if a > b {
-// 		return a
-// 	}
-// 	return b
-// }
-
 func StoreSpacesTransactions(ctx context.Context, txs []node.MetaTransaction, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
 	for _, tx := range txs {
 		sqlTx, err := StoreSpacesTransaction(ctx, tx, blockHash, sqlTx)
@@ -36,9 +29,16 @@ func StoreSpacesTransactions(ctx context.Context, txs []node.MetaTransaction, bl
 	return sqlTx, nil
 }
 
-func StoreSpacesPtrTransactions(ctx context.Context, txs []node.PtrTxMeta, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
-	for _, tx := range txs {
-		sqlTx, err := StoreSpacesPtrTransaction(ctx, tx, blockHash, sqlTx)
+func StoreSpacesPtrTransactions(ctx context.Context, ptrTxs []node.PtrTxMeta, btcTxs []node.Transaction, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
+	// Create a map of txid -> Bitcoin transaction for quick lookup
+	btcTxMap := make(map[string]*node.Transaction)
+	for i := range btcTxs {
+		btcTxMap[btcTxs[i].Txid.String()] = &btcTxs[i]
+	}
+
+	for _, ptrTx := range ptrTxs {
+		btcTx := btcTxMap[ptrTx.TxID.String()]
+		sqlTx, err := StoreSpacesPtrTransaction(ctx, ptrTx, btcTx, blockHash, sqlTx)
 		if err != nil {
 			return sqlTx, err
 		}
@@ -46,8 +46,47 @@ func StoreSpacesPtrTransactions(ctx context.Context, txs []node.PtrTxMeta, block
 	return sqlTx, nil
 }
 
-func StoreSpacesPtrTransaction(ctx context.Context, tx node.PtrTxMeta, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
+func StoreSpacesPtrTransaction(ctx context.Context, tx node.PtrTxMeta, btcTx *node.Transaction, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
+	// log.Printf("%+v", tx)
 	q := db.New(sqlTx)
+
+	// Update spenders for space pointers being spent
+	if btcTx != nil {
+		for _, spendIndex := range tx.Spends {
+			if int(spendIndex) >= len(btcTx.Vin) {
+				log.Printf("WARNING: Spend index %d out of range for transaction %s (has %d inputs)", spendIndex, tx.TxID.String(), len(btcTx.Vin))
+				continue
+			}
+
+			vin := btcTx.Vin[spendIndex]
+			if vin.HashPrevout == nil || vin.Coinbase != nil {
+				continue // Skip coinbase inputs
+			}
+
+			// Find the space pointer being spent
+			spacePointer, err := q.FindSpacePointerByOutpoint(ctx, db.FindSpacePointerByOutpointParams{
+				Txid: *vin.HashPrevout,
+				Vout: int32(vin.IndexPrevout),
+			})
+			if err != nil {
+				log.Printf("WARNING: Space pointer not found for prevout %s:%d - Error: %v", vin.HashPrevout.String(), vin.IndexPrevout, err)
+				continue
+			}
+
+			// Update the spender fields
+			err = q.UpdateSpacePointerSpender(ctx, db.UpdateSpacePointerSpenderParams{
+				SpentBlockHash: &blockHash,
+				SpentTxid:      &tx.TxID,
+				SpentVin:       pgtype.Int4{Int32: int32(spendIndex), Valid: true},
+				BlockHash:      spacePointer.BlockHash,
+				Txid:           spacePointer.Txid,
+				Vout:           spacePointer.Vout,
+			})
+			if err != nil {
+				log.Printf("WARNING: Failed to update space pointer spender for %s:%d - Error: %v", vin.HashPrevout.String(), vin.IndexPrevout, err)
+			}
+		}
+	}
 
 	for _, commitment := range tx.Commitments {
 		if commitment.Space[0] == '@' {
@@ -90,6 +129,86 @@ func StoreSpacesPtrTransaction(ctx context.Context, tx node.PtrTxMeta, blockHash
 		})
 		if err != nil {
 			return sqlTx, fmt.Errorf("failed to insert revoked commitment: %w", err)
+		}
+	}
+
+	for _, ptrOut := range tx.Creates {
+		if ptrOut.ID != nil {
+			var data *Bytes
+			if ptrOut.Data != nil {
+				data = ptrOut.Data
+			}
+			log.Printf("%+v", *ptrOut.ID)
+
+			err := q.InsertSpacePointer(ctx, db.InsertSpacePointerParams{
+				BlockHash:    blockHash,
+				Txid:         tx.TxID,
+				Vout:         int32(ptrOut.N),
+				Sptr:         *ptrOut.ID,
+				Value:        int64(ptrOut.Value),
+				ScriptPubkey: ptrOut.ScriptPubkey,
+				Data:         data,
+			})
+			if err != nil {
+				return sqlTx, fmt.Errorf("failed to insert space pointer: %w", err)
+			}
+		}
+	}
+
+	for _, delegation := range tx.NewDelegations {
+		name := delegation.Space
+		if name[0] == '@' {
+			name = name[1:]
+		}
+
+		// Find the vout index for this delegation by matching the SptrKey
+		var vout int32
+		for _, ptrOut := range tx.Creates {
+			if ptrOut.ID != nil && *ptrOut.ID == delegation.Sptr {
+				vout = int32(ptrOut.N)
+				break
+			}
+		}
+
+		err := q.InsertDelegation(ctx, db.InsertDelegationParams{
+			Sptr:      delegation.Sptr,
+			Name:      name,
+			BlockHash: blockHash,
+			Txid:      tx.TxID,
+			Vout:      vout,
+		})
+		if err != nil {
+			return sqlTx, fmt.Errorf("failed to insert delegation: %w", err)
+		}
+	}
+
+	// Mark revoked delegations
+	for _, delegation := range tx.RevokedDelegations {
+		name := delegation.Space
+		if name[0] == '@' {
+			name = name[1:]
+		}
+
+		// Find the latest active delegation for this sptr and name
+		existingDelegation, err := q.FindLatestDelegationBySptr(ctx, db.FindLatestDelegationBySptrParams{
+			Sptr: delegation.Sptr,
+			Name: name,
+		})
+		if err != nil {
+			log.Printf("WARNING: Could not find delegation to revoke - Space: %s, Sptr: %s, Error: %v", name, delegation.Sptr, err)
+			continue
+		}
+
+		err = q.UpdateDelegationRevoked(ctx, db.UpdateDelegationRevokedParams{
+			RevokedBlockHash: &blockHash,
+			RevokedTxid:      &tx.TxID,
+			RevokedVout:      pgtype.Int4{Int32: 0, Valid: true}, // TODO: What should this be?
+			BlockHash:        existingDelegation.BlockHash,
+			Txid:             existingDelegation.Txid,
+			Vout:             existingDelegation.Vout,
+		})
+		if err != nil {
+			return sqlTx, fmt.Errorf("failed to revoke delegation: %w", err)
 		}
 	}
 
@@ -489,7 +608,7 @@ func StoreBlock(ctx context.Context, pg *pgx.Conn, block *node.Block, sc *node.S
 			return err
 		}
 
-		tx, err = StoreSpacesPtrTransactions(ctx, spacesPtrBlock.Transactions, block.Hash, tx)
+		tx, err = StoreSpacesPtrTransactions(ctx, spacesPtrBlock.Transactions, block.Transactions, block.Hash, tx)
 		if err != nil {
 			return err
 		}

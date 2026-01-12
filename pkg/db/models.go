@@ -92,6 +92,33 @@ type Rollout struct {
 	Target int64
 }
 
+type SpacePointer struct {
+	Identifier     int64
+	BlockHash      types.Bytes
+	Txid           types.Bytes
+	Vout           int32
+	Sptr           string
+	Value          int64
+	ScriptPubkey   types.Bytes
+	Data           *types.Bytes
+	SpentBlockHash *types.Bytes
+	SpentTxid      *types.Bytes
+	SpentVin       pgtype.Int4
+}
+
+type SptrDelegation struct {
+	Identifier       int64
+	Sptr             string
+	Name             string
+	BlockHash        types.Bytes
+	Txid             types.Bytes
+	Vout             int32
+	Revoked          bool
+	RevokedBlockHash *types.Bytes
+	RevokedTxid      *types.Bytes
+	RevokedVout      pgtype.Int4
+}
+
 type Transaction struct {
 	Txid             types.Bytes
 	TxHash           types.Bytes

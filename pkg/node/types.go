@@ -306,6 +306,6 @@ type Commitment struct {
 }
 
 type Delegation struct {
-	Space   string `json:"space"`
-	SptrKey Bytes  `json:"sptr_key"`
+	Space string `json:"space"`
+	Sptr  string `json:"sptr"`
 }
