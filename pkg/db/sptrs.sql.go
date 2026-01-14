@@ -208,3 +208,71 @@ func (q *Queries) UpdateSpacePointerSpender(ctx context.Context, arg UpdateSpace
 	)
 	return err
 }
+
+const upsertDelegation = `-- name: UpsertDelegation :exec
+INSERT INTO sptr_delegations (
+    sptr,
+    name,
+    block_hash,
+    txid,
+    vout
+)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (block_hash, txid, vout) DO NOTHING
+`
+
+type UpsertDelegationParams struct {
+	Sptr      string
+	Name      string
+	BlockHash types.Bytes
+	Txid      types.Bytes
+	Vout      int32
+}
+
+func (q *Queries) UpsertDelegation(ctx context.Context, arg UpsertDelegationParams) error {
+	_, err := q.db.Exec(ctx, upsertDelegation,
+		arg.Sptr,
+		arg.Name,
+		arg.BlockHash,
+		arg.Txid,
+		arg.Vout,
+	)
+	return err
+}
+
+const upsertSpacePointer = `-- name: UpsertSpacePointer :exec
+INSERT INTO space_pointers (
+    block_hash,
+    txid,
+    vout,
+    sptr,
+    value,
+    script_pubkey,
+    data
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (block_hash, txid, vout) DO NOTHING
+`
+
+type UpsertSpacePointerParams struct {
+	BlockHash    types.Bytes
+	Txid         types.Bytes
+	Vout         int32
+	Sptr         string
+	Value        int64
+	ScriptPubkey types.Bytes
+	Data         *types.Bytes
+}
+
+func (q *Queries) UpsertSpacePointer(ctx context.Context, arg UpsertSpacePointerParams) error {
+	_, err := q.db.Exec(ctx, upsertSpacePointer,
+		arg.BlockHash,
+		arg.Txid,
+		arg.Vout,
+		arg.Sptr,
+		arg.Value,
+		arg.ScriptPubkey,
+		arg.Data,
+	)
+	return err
+}

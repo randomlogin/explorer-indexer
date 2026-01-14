@@ -62,3 +62,29 @@ JOIN blocks ON space_pointers.block_hash = blocks.hash
 WHERE space_pointers.txid = $1
   AND space_pointers.vout = $2
   AND blocks.orphan = false;
+
+
+-- name: UpsertSpacePointer :exec
+INSERT INTO space_pointers (
+    block_hash,
+    txid,
+    vout,
+    sptr,
+    value,
+    script_pubkey,
+    data
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (block_hash, txid, vout) DO NOTHING;
+
+
+-- name: UpsertDelegation :exec
+INSERT INTO sptr_delegations (
+    sptr,
+    name,
+    block_hash,
+    txid,
+    vout
+)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (block_hash, txid, vout) DO NOTHING;

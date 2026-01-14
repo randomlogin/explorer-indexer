@@ -47,7 +47,6 @@ func StoreSpacesPtrTransactions(ctx context.Context, ptrTxs []node.PtrTxMeta, bt
 }
 
 func StoreSpacesPtrTransaction(ctx context.Context, tx node.PtrTxMeta, btcTx *node.Transaction, blockHash Bytes, sqlTx pgx.Tx) (pgx.Tx, error) {
-	// log.Printf("%+v", tx)
 	q := db.New(sqlTx)
 
 	// Update spenders for space pointers being spent
@@ -138,7 +137,6 @@ func StoreSpacesPtrTransaction(ctx context.Context, tx node.PtrTxMeta, btcTx *no
 			if ptrOut.Data != nil {
 				data = ptrOut.Data
 			}
-			log.Printf("%+v", *ptrOut.ID)
 
 			err := q.InsertSpacePointer(ctx, db.InsertSpacePointerParams{
 				BlockHash:    blockHash,
@@ -619,7 +617,6 @@ func StoreBlock(ctx context.Context, pg *pgx.Conn, block *node.Block, sc *node.S
 }
 
 func StoreTransaction(ctx context.Context, q *db.Queries, transaction *node.Transaction, blockHash *Bytes, txIndex *int32) error {
-	// log.Printf("%+v", transaction)
 	if err := storeTransactionBase(ctx, q, transaction, blockHash, txIndex); err != nil {
 		return err
 	}

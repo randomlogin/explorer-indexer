@@ -97,23 +97,24 @@ func syncSpacesTransactions(pg *pgx.Conn, bc *node.BitcoinClient, sc *node.Space
 	log.Printf("Starting spaces transactions sync from block %d to %d", activationBlock, endHeight)
 
 	for height := activationBlock; height <= endHeight; height++ {
+		start := time.Now()
 		blockHash, err := bc.GetBlockHash(ctx, int(height))
 		if err != nil {
 			return err
 		}
 
-		log.Printf("Processing block %d with hash %s", height, blockHash.String())
+		// log.Printf("Processing block %d with hash %s", height, blockHash.String())
+
 		spacesBlock, err := sc.GetBlockMeta(ctx, blockHash.String())
 		if err != nil {
 			return err
 		}
 
-		start := time.Now()
 		txCount := len(spacesBlock.Transactions)
 
 		for txIndex, spaceTx := range spacesBlock.Transactions {
 			if txIndex > 0 && txIndex%50 == 0 {
-				log.Printf("  Processed %d/%d transactions in block %d", txIndex, txCount, height)
+				log.Printf("  Processed %d/%d spaces transactions in block %d", txIndex, txCount, height)
 			}
 
 			tx, err = store.StoreSpacesTransaction(ctx, spaceTx, *blockHash, tx)
@@ -122,18 +123,59 @@ func syncSpacesTransactions(pg *pgx.Conn, bc *node.BitcoinClient, sc *node.Space
 			}
 		}
 
-		// Log completion for this block
-		elapsed := time.Since(start)
-		log.Printf("Block %d completed in %s with %d spaces transactions",
-			height, elapsed, txCount)
+		spacesPtrBlock, err := sc.GetPtrBlockMeta(ctx, blockHash.String())
+		if err != nil {
+			return err
+		}
+
+		ptrTxCount := len(spacesPtrBlock.Transactions)
+
+		// var block *node.Block
+		// needBitcoinBlock := false
+		// for _, ptrTx := range spacesPtrBlock.Transactions {
+		// 	if len(ptrTx.Spends) > 0 {
+		// 		needBitcoinBlock = true
+		// 		break
+		// 	}
+		// }
+		//
+		// if needBitcoinBlock {
+		// 	block, err = bc.GetBlock(ctx, blockHash.String())
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// }
+		for _, ptrTx := range spacesPtrBlock.Transactions {
+
+			// Find matching Bitcoin transaction
+			var btcTx *node.Transaction
+			// if block != nil {
+			btcTx, err := bc.GetTransaction(ctx, ptrTx.TxID.String())
+			if err != nil {
+				return err
+			}
+			// for i := range block.Transactions {
+			// 	if block.Transactions[i].Txid.String() == ptrTx.TxID.String() {
+			// 		btcTx = &block.Transactions[i]
+			// 		break
+			// 	}
+			// }
+			// }
+
+			tx, err = store.StoreSpacesPtrTransaction(ctx, ptrTx, btcTx, *blockHash, tx)
+			if err != nil {
+				return err
+			}
+		}
 
 		// Commit every N blocks to avoid large transactions
-		if height%10 == 0 {
+		if height%5000 == 0 {
+			elapsed := time.Since(start)
+			log.Printf("Block %d completed in %s with %d spaces tx and %d ptr tx", height, elapsed, txCount, ptrTxCount)
 			if err := tx.Commit(ctx); err != nil {
 				return err
 			}
 
-			// Start new transaction
 			tx, err = pg.Begin(ctx)
 			if err != nil {
 				return err
