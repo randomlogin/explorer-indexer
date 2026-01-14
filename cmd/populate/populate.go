@@ -45,7 +45,7 @@ func main() {
 
 	// Initialize clients
 	bitcoinClient := node.NewClient(os.Getenv("BITCOIN_NODE_URI"), os.Getenv("BITCOIN_NODE_USER"), os.Getenv("BITCOIN_NODE_PASSWORD"))
-	spacesClient := node.NewClient(os.Getenv("SPACES_NODE_URI"), "test", "test")
+	spacesClient := node.NewClient(os.Getenv("SPACES_NODE_URI"), os.Getenv("RPC_USER"), os.Getenv("RPC_PASSWORD"))
 	bc := node.BitcoinClient{Client: bitcoinClient}
 	sc := node.SpacesClient{Client: spacesClient}
 
@@ -147,20 +147,10 @@ func syncSpacesTransactions(pg *pgx.Conn, bc *node.BitcoinClient, sc *node.Space
 		// }
 		for _, ptrTx := range spacesPtrBlock.Transactions {
 
-			// Find matching Bitcoin transaction
-			var btcTx *node.Transaction
-			// if block != nil {
 			btcTx, err := bc.GetTransaction(ctx, ptrTx.TxID.String())
 			if err != nil {
 				return err
 			}
-			// for i := range block.Transactions {
-			// 	if block.Transactions[i].Txid.String() == ptrTx.TxID.String() {
-			// 		btcTx = &block.Transactions[i]
-			// 		break
-			// 	}
-			// }
-			// }
 
 			tx, err = store.StoreSpacesPtrTransaction(ctx, ptrTx, btcTx, *blockHash, tx)
 			if err != nil {
