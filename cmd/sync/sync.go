@@ -16,7 +16,6 @@ import (
 	"github.com/spacesprotocol/explorer-indexer/pkg/store"
 
 	_ "github.com/lib/pq"
-	. "github.com/spacesprotocol/explorer-indexer/pkg/types"
 )
 
 var activationBlock = getActivationBlock()
@@ -64,7 +63,7 @@ func main() {
 
 	updateInterval, err := strconv.Atoi(os.Getenv("UPDATE_DB_INTERVAL"))
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalln(err, "perhaps UPDATE_DB_INTERVAL is not set")
 	}
 
 	for {
@@ -175,11 +174,7 @@ func syncRollouts(ctx context.Context, pg *pgx.Conn, sc *node.SpacesClient) erro
 	return nil
 }
 
-// func syncCommitments(ctx context.Context, pg *pgx.Conn, sc *node.SpacesClient) error {
-// }
-
 func syncBlocks(ctx context.Context, pg *pgx.Conn, bc *node.BitcoinClient, sc *node.SpacesClient) error {
-	var hash *Bytes
 	height, hash, err := store.GetSyncedHead(ctx, pg, bc)
 	if err != nil {
 		return err

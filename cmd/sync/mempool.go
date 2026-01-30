@@ -21,8 +21,6 @@ func syncMempool(ctx context.Context, pg *pgx.Conn, bc *node.BitcoinClient, sc *
 		return err
 	}
 
-	// log.Print(currentGroups)
-
 	// Build current mempool map
 	nodeMempoolTxs := make(map[string]struct{})
 	for _, group := range currentGroups {
@@ -115,7 +113,7 @@ func cleanupMempoolTxs(ctx context.Context, pg *pgx.Conn, nodeMempoolTxs map[str
 		q := db.New(sqlTx)
 
 		// Delete in chunks to avoid overwhelming the database
-		chunkSize := 500
+		chunkSize := mempoolChunkSize
 		for i := 0; i < len(toDelete); i += chunkSize {
 			end := i + chunkSize
 			if end > len(toDelete) {
@@ -149,9 +147,7 @@ func processTxGroup(ctx context.Context, sqlTx pgx.Tx, bc *node.BitcoinClient, s
 
 		// Store only the last transaction (dependent one)
 		if i == len(txGroup)-1 {
-			// log.Print("pizdos")
 			if err := store.StoreTransaction(ctx, q, tx, &deadbeef, nil); err != nil {
-				// log.Print("pizdosaaaa:w")
 				return err
 			}
 		}

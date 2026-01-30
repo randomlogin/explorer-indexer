@@ -7,8 +7,6 @@ import (
 	. "github.com/spacesprotocol/explorer-indexer/pkg/types"
 )
 
-var mempoolChunkSize = 200
-
 type BitcoinClient struct {
 	*Client
 }

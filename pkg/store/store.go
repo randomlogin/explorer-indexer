@@ -200,7 +200,7 @@ func StoreSpacesPtrTransaction(ctx context.Context, tx node.PtrTxMeta, btcTx *no
 		err = q.UpdateDelegationRevoked(ctx, db.UpdateDelegationRevokedParams{
 			RevokedBlockHash: &blockHash,
 			RevokedTxid:      &tx.TxID,
-			RevokedVout:      pgtype.Int4{Int32: 0, Valid: true}, // TODO: What should this be?
+			RevokedVout:      pgtype.Int4{Int32: 0, Valid: true}, //now we don't have output index set
 			BlockHash:        existingDelegation.BlockHash,
 			Txid:             existingDelegation.Txid,
 			Vout:             existingDelegation.Vout,
@@ -296,6 +296,7 @@ func StoreSpacesTransaction(ctx context.Context, tx node.MetaTransaction, blockH
 	}
 
 	for _, update := range tx.Updates {
+
 		vmet := db.InsertVMetaOutParams{
 			BlockHash:     blockHash,
 			Txid:          tx.TxID,

@@ -17,6 +17,8 @@ import (
 var activationBlock = getActivationBlock()
 var syncEndHeight = getSyncEndHeight()
 
+const blockCountToCommit = 5000
+
 func getActivationBlock() int32 {
 	if height := os.Getenv("ACTIVATION_BLOCK_HEIGHT"); height != "" {
 		if h, err := strconv.ParseInt(height, 10, 32); err == nil {
@@ -103,8 +105,6 @@ func syncSpacesTransactions(pg *pgx.Conn, bc *node.BitcoinClient, sc *node.Space
 			return err
 		}
 
-		// log.Printf("Processing block %d with hash %s", height, blockHash.String())
-
 		spacesBlock, err := sc.GetBlockMeta(ctx, blockHash.String())
 		if err != nil {
 			return err
@@ -130,21 +130,6 @@ func syncSpacesTransactions(pg *pgx.Conn, bc *node.BitcoinClient, sc *node.Space
 
 		ptrTxCount := len(spacesPtrBlock.Transactions)
 
-		// var block *node.Block
-		// needBitcoinBlock := false
-		// for _, ptrTx := range spacesPtrBlock.Transactions {
-		// 	if len(ptrTx.Spends) > 0 {
-		// 		needBitcoinBlock = true
-		// 		break
-		// 	}
-		// }
-		//
-		// if needBitcoinBlock {
-		// 	block, err = bc.GetBlock(ctx, blockHash.String())
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// }
 		for _, ptrTx := range spacesPtrBlock.Transactions {
 
 			btcTx, err := bc.GetTransaction(ctx, ptrTx.TxID.String())
@@ -159,7 +144,7 @@ func syncSpacesTransactions(pg *pgx.Conn, bc *node.BitcoinClient, sc *node.Space
 		}
 
 		// Commit every N blocks to avoid large transactions
-		if height%5000 == 0 {
+		if height%blockCountToCommit == 0 {
 			elapsed := time.Since(start)
 			log.Printf("Block %d completed in %s with %d spaces tx and %d ptr tx", height, elapsed, txCount, ptrTxCount)
 			if err := tx.Commit(ctx); err != nil {
@@ -171,13 +156,11 @@ func syncSpacesTransactions(pg *pgx.Conn, bc *node.BitcoinClient, sc *node.Space
 				return err
 			}
 			defer tx.Rollback(ctx)
-			q = db.New(tx)
 
 			log.Printf("Committed progress at block %d", height)
 		}
 	}
 
-	// Final commit
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
