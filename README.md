@@ -6,8 +6,9 @@ The indexer retrieves block data from the bitcoin and spaces nodes and stores it
 ## Operation
 
 It stores both bitcoin and spaces data, for the bitcoin data it only stores tx hashes and number of inputs and outputs
-along with their values (no scriptsig/scriptpubkey/witness data). It is capable of detecting chain reorganizations,
-moreover it stores orphaned txs. Also it syncs the local bitcoin node mempool and parses corresponding spaces events (however
+along with their values (no scriptsig/scriptpubkey/witness data). 
+
+It is capable of detecting chain reorganizations, moreover it stores orphaned txs. Also it syncs the local bitcoin node mempool and parses corresponding spaces events (however
 does not store space pointers mempool events, as the needed spaced API is not ready as of time of writing).
 
 
@@ -15,14 +16,14 @@ It has several modes of operation, the main one comes with an executable `sync` 
 It has 'fast' sync which starts not from the genesis block, but from FAST_SYNC_BLOCK_HEIGHT, also will sync spaces data
 only from ACTIVATION_BLOCK_HEIGHT. See additional environment variables in env.example.
 
-Another executable is `populate` which is used only to populate spaces data, which is useful when a new breaking feature
-is added: one can delete spaces-related tables completely and make a fresh sync which is considerably quick.
+Another executable is `populate` which is used only to populate spaces data, which is useful when a new non-backward
+compatible feature is added: one can delete spaces-related tables completely and make a fresh sync which is considerably quick.
 
 ### Database Design Note
 
 Since the indexer stores both orphaned blocks and mempool transactions, there are "virtual" blocks in the database:
-- **Mempool transactions** use a special block hash: `deadbeefdeadbeef...` (32 bytes of repeated `0xdeadbeef`)
-- **Orphaned blocks** are kept with `orphan = true` flag
+- Mempool transactions use a special block hash: `deadbeefdeadbeef...` 
+- Orphaned blocks are kept with `orphan = true` flag
 
 Because of this, a transaction is uniquely identified by the pair `(block_hash, txid)`, not just by `txid` alone. The same transaction may appear multiple times with different block hashes (e.g., once in mempool, once in a confirmed block, or in competing chain tips).
 
@@ -42,7 +43,7 @@ sc := node.SpacesClient{Client: node.NewClient(uri, user, password)}
 meta, err := sc.GetBlockMeta(ctx, blockHash)
 ```
 
-This package is used by other projects such as [spaces marketplace](https://github.com/spacesprotocol/marketplace).
+This package is used by other projects such as [spaces marketplace](https://spaces.market)
 
 ## Requirements
 - Go v1.21 or higher
@@ -67,20 +68,13 @@ go mod download
 go build ./cmd/sync
 go build ./cmd/populate
 ```
-
+## Running 
 
 ### Sync Service
 The primary service that indexes both bitcoin and spaces protocol data:
 ```bash
 ./sync
 ```
-
-Supports two sync modes:
-- **Full Sync**: Indexes from the genesis block (slower but complete)
-- **Fast Sync**: Starts from the spaces protocol activation block
-  - Mainnet: Block 871222
-  - Testnet4: Block 50000
-
 
 ### Configuration
 Configuration is handled through environment variables. Copy and modify the example configuration:
